@@ -8,6 +8,7 @@ from typing import Optional
 
 from rich.console import Console
 
+from . import __version__
 from .config import AgenteConfig
 from .entidades import get_entidade
 from .pg_client import stream_rows
@@ -56,13 +57,20 @@ def executar_job(
             staging = ent["staging"]
             transform = ent["transform"]
             sql = params.get("query") or ent["query"]
+            cod_lote = params.get("cod_lote")
+            if cod_lote is None:
+                raise ValueError(
+                    "Parâmetro 'cod_lote' é obrigatório para jobs de EXTRACAO"
+                )
 
             for batch in stream_rows(cfg.pg, sql, batch_size=batch_size):
                 qtd_lidos += len(batch)
                 stg_rows = []
                 for row in batch:
                     try:
-                        stg_rows.append(transform(row))
+                        stg_row = transform(row)
+                        stg_row["cod_lote"] = cod_lote
+                        stg_rows.append(stg_row)
                     except Exception:  # noqa: BLE001
                         qtd_rejeitados += 1
                 if stg_rows:
@@ -141,6 +149,7 @@ def loop_polling(cfg: AgenteConfig, intervalo: float = 5.0) -> None:
                     {
                         "p_cod_agente_sessao": cfg.sessao.cod_agente_sessao,
                         "p_token": cfg.sessao.token,
+                        "p_des_versao_agente": __version__,
                     },
                 ) or []
                 ultimo_hb = agora
