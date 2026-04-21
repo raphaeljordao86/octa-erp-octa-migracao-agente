@@ -1,0 +1,33 @@
+[project]
+name = "octa-migracao-agente"
+version = "0.1.0"
+description = "Agente local que extrai dados do banco legado e envia para o Octa ERP"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Octa ERP" }]
+dependencies = [
+  "psycopg[binary]>=3.2",
+  "httpx>=0.27",
+  "rich>=13.7",
+  "typer>=0.12",
+  "tomli>=2.0; python_version<'3.11'",
+  "tomli-w>=1.0",
+]
+
+[project.scripts]
+octa-migracao = "octa_migracao_agente.cli:app"
+
+[project.optional-dependencies]
+dev = ["ruff>=0.5", "pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
