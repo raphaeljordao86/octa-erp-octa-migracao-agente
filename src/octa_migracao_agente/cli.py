@@ -14,7 +14,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from . import __version__
-from .config import AgenteConfig, PgConfig
+from .config import CONFIG_FILE, AgenteConfig, PgConfig
 from .pg_client import testar as pg_testar
 from .runner import loop_polling
 from .supabase_client import SupabaseClient
@@ -146,6 +146,85 @@ def testar_pg() -> None:
     except Exception as exc:  # noqa: BLE001
         console.print(f"[red]✗ Falhou:[/] {exc}")
         raise typer.Exit(code=1)
+
+
+@app.command("configurar-legado")
+def configurar_legado(
+    host: Optional[str] = typer.Option(None, "--host", help="Host do Postgres legado"),
+    port: Optional[int] = typer.Option(None, "--port", help="Porta (padrão 5432)"),
+    database: Optional[str] = typer.Option(None, "--database", "--db", help="Nome do banco"),
+    user: Optional[str] = typer.Option(None, "--user", "-u", help="Usuário"),
+    password: Optional[str] = typer.Option(
+        None, "--password", "-p", help="Senha (se omitido, será pedido com prompt oculto)"
+    ),
+    ssl: Optional[bool] = typer.Option(
+        None, "--ssl/--no-ssl", help="Usar SSL na conexão (padrão: ssl)"
+    ),
+    testar: bool = typer.Option(
+        True, "--testar/--nao-testar", help="Testar conexão após salvar"
+    ),
+) -> None:
+    """Configura (ou atualiza) a conexão com o Postgres legado.
+
+    As credenciais ficam SÓ neste computador (~/.octa-migracao/config.toml, chmod 600).
+    Nunca são enviadas para a Supabase.
+    """
+    cfg = AgenteConfig.carregar()
+
+    # aplica flags fornecidas
+    if host is not None:
+        cfg.pg.host = host
+    if port is not None:
+        cfg.pg.port = port
+    if database is not None:
+        cfg.pg.database = database
+    if user is not None:
+        cfg.pg.user = user
+    if password is not None:
+        cfg.pg.password = password
+    if ssl is not None:
+        cfg.pg.ssl = ssl
+
+    # fallback interativo para o que ficou faltando
+    if not cfg.pg.host:
+        cfg.pg.host = Prompt.ask("Host")
+    if not cfg.pg.port:
+        cfg.pg.port = int(Prompt.ask("Porta", default="5432"))
+    if not cfg.pg.database:
+        cfg.pg.database = Prompt.ask("Banco de dados")
+    if not cfg.pg.user:
+        cfg.pg.user = Prompt.ask("Usuário")
+    if not cfg.pg.password:
+        cfg.pg.password = getpass.getpass("Senha: ")
+    if ssl is None and not cfg.pg.host.endswith("supabase.co"):
+        # só pergunta se não veio por flag e não é supabase
+        cfg.pg.ssl = Confirm.ask("Usar SSL?", default=cfg.pg.ssl)
+
+    cfg.salvar()
+    console.print(
+        f"[green]✓ Configuração salva[/] em [dim]{CONFIG_FILE}[/]\n"
+        f"  host={cfg.pg.host}  port={cfg.pg.port}  db={cfg.pg.database}  "
+        f"user={cfg.pg.user}  ssl={cfg.pg.ssl}"
+    )
+
+    if testar:
+        console.print("\n[bold]Testando conexão…[/]")
+        try:
+            meta = pg_testar(cfg.pg)
+            console.print("[green]✓ Conectado![/]")
+            t = Table(show_header=False)
+            t.add_column("Campo", style="bold")
+            t.add_column("Valor")
+            for k, v in meta.items():
+                t.add_row(k, str(v))
+            console.print(t)
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[red]✗ Falhou na conexão:[/] {exc}")
+            console.print(
+                "[yellow]Configuração foi salva mesmo assim.[/] "
+                "Corrija com `octa-migracao configurar-legado` e teste com `octa-migracao testar-pg`."
+            )
+            raise typer.Exit(code=1)
 
 
 @app.command()
