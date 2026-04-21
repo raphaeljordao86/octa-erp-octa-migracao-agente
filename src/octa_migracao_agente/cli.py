@@ -246,3 +246,13 @@ def versao() -> None:
 
 if __name__ == "__main__":
     app()
+
+
+@app.command()
+def versao() -> None:
+    """Mostra versão do agente."""
+    console.print(f"octa-migracao-agente v{__version__}")
+
+
+if __name__ == "__main__":
+    app()
