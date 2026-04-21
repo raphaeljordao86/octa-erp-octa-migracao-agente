@@ -132,10 +132,21 @@ if ($ScriptsDir -and (Test-Path $ScriptsDir)) {
 
 # --- 6. Validar comando ---
 Write-Step "Validando instalacao..."
+$cmdInfo = Get-Command octa-migracao -ErrorAction SilentlyContinue
 if (Test-Command octa-migracao) {
     Write-Ok "Comando 'octa-migracao' disponivel."
     $verInstalada = (python -c "import octa_migracao_agente; print(octa_migracao_agente.__version__)" 2>$null).Trim()
     if ($verInstalada) { Write-Ok "Versao instalada: $verInstalada" }
+
+    if ($cmdInfo -and $cmdInfo.Source) {
+        Write-Ok "Executavel em uso: $($cmdInfo.Source)"
+        if ($ScriptsDir -and ($cmdInfo.Source -notlike "$ScriptsDir*")) {
+            Write-Warn "O Windows esta resolvendo 'octa-migracao' fora da pasta recem-instalada."
+            Write-Host "  Rode este executavel diretamente para garantir a versao nova:" -ForegroundColor Yellow
+            Write-Host "    & '$ScriptsDir\octa-migracao.exe' versao" -ForegroundColor Yellow
+            Write-Host "    & '$ScriptsDir\octa-migracao.exe' run" -ForegroundColor Yellow
+        }
+    }
 } else {
     Write-Warn "O comando ainda nao esta visivel nesta sessao do PowerShell."
     Write-Host "  FECHE este PowerShell, abra um NOVO e rode novamente o comando de pareamento." -ForegroundColor Yellow
